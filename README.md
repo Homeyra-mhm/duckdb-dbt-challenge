@@ -28,7 +28,7 @@ Your goal is to build a **DBT project**:
 We will use the **New York City Taxi Trips Dataset**, which contains trip records of taxis in NYC. This dataset is publicly available and can be downloaded using the following:
 
 ```shell
-$ wget https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-08.parquet  
+$ wget https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet  
 ```
 
 **Key Columns**:
@@ -121,13 +121,16 @@ Here are examples of expected output tables:
 $ uv venv
 $ source .venv/bin/activate
 $ uv sync
-$ wget https://github.com/duckdb/duckdb/releases/download/v1.4.0/duckdb_cli-linux-amd64.zip && unzip duckdb_cli-linux-amd64.zip && mv duckdb .venv/bin/
+# Linux (amd64)
+$ wget https://github.com/duckdb/duckdb/releases/download/v1.5.6/duckdb_cli-linux-amd64.zip && unzip duckdb_cli-linux-amd64.zip && mv duckdb .venv/bin/
+# macOS (Intel / Apple Silicon)
+$ wget https://github.com/duckdb/duckdb/releases/download/v1.5.6/duckdb_cli-osx-universal.zip && unzip duckdb_cli-osx-universal.zip && mv duckdb .venv/bin/
 $ uv run dbt deps 
-$ wget  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-08.parquet -P data/raw
+$ wget  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet -P data/raw
 $ uv run dbt run
-13:38:13  Running with dbt=1.10.13
-13:38:13  Registered adapter: duckdb=1.9.6
-13:38:13  Found 1 model, 547 macros
+13:38:13  Running with dbt=1.12.5
+13:38:13  Registered adapter: duckdb=1.11.0
+13:38:13  Found 1 model, 616 macros
 13:38:13  
 13:38:13  Concurrency: 1 threads (target='dev')
 13:38:13  
@@ -138,7 +141,7 @@ $ uv run dbt run
 13:38:14  
 13:38:14  Completed successfully
 13:38:14  
-13:38:14  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=1
+13:38:14  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1
 
 $ uv run duckdb data/db/yellow_tripdata.duckdb "select  * from staging_yellow_tripdata limit 10"
 ---

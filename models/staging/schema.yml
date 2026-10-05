@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: staging_yellow_tripdata
+    description: "Cleaned trip records with duration quality and distance classification."
+    columns:
+      - name: pickup_datetime
+        description: "Required to calculate duration and assign the pickup time bucket."
+        data_tests:
+          - not_null
+      - name: dropoff_datetime
+        description: "Required to calculate duration and classify timestamp quality."
+        data_tests:
+          - not_null
+      - name: duration_quality_status
+        description: "Timestamp consistency: valid, zero duration, or negative duration."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['valid', 'zero_duration', 'negative_duration']
+      - name: distance_category
+        description: "Distance in miles: short [0, 2), medium [2, 5], long > 5."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['short', 'medium', 'long']
+
+sources:
+  - name: nyc_taxi
+    description: "NYC Yellow Taxi July 2026 raw Parquet data."
+    tables:
+      - name: yellow_tripdata
+        config:
+          meta:
+            external_location: "data/raw/yellow_tripdata_2026-07.parquet"
+
+unit_tests:
+  - name: staging_duration_cases
+    description: "Preserve sub-minute trips and classify zero and negative durations."
+    model: staging_yellow_tripdata
+    given:
+      - input: source('nyc_taxi', 'yellow_tripdata')
+        format: sql
+        rows: |
+          select
+              1::integer as VendorID,
+              timestamp '2026-07-01 10:00:00' as tpep_pickup_datetime,
+              dropoff as tpep_dropoff_datetime,
+              1::bigint as passenger_count,
+              1.0::double as trip_distance,
+              1::bigint as RatecodeID,
+              161::integer as PULocationID,
+              237::integer as DOLocationID,
+              1::bigint as payment_type,
+              8.0::double as fare_amount,
+              2.0::double as tip_amount,
+              10.0::double as total_amount
+          from (values
+              (timestamp '2026-07-01 10:00:40'),
+              (timestamp '2026-07-01 10:00:00'),
+              (timestamp '2026-07-01 09:59:30')
+          ) as cases(dropoff)
+    expect:
+      rows:
+        - dropoff_datetime: '2026-07-01 10:00:40'
+          trip_duration_minutes: 0.6666666666666666
+          duration_quality_status: valid
+        - dropoff_datetime: '2026-07-01 10:00:00'
+          trip_duration_minutes: 0.0
+          duration_quality_status: zero_duration
+        - dropoff_datetime: '2026-07-01 09:59:30'
+          trip_duration_minutes: -0.5
+          duration_quality_status: negative_duration

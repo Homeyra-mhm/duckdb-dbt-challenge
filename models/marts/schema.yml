@@ -1,0 +1,46 @@
+﻿version: 2
+
+models:
+  - name: mart_trips_by_time_of_day
+    description: "Trip counts and revenue by pickup time of day category."
+    columns:
+      - name: time_of_day
+        description: "Time of day category defining the grain of the mart."
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['morning', 'afternoon', 'evening', 'night']
+  - name: mart_top_pickup_zones
+    description: "Top five pickup zones ranked by trip count."
+    columns:
+      - name: pickup_location_id
+        description: "Pickup zone identifier defining the grain of the mart."
+        data_tests:
+          - unique
+          - not_null
+  - name: mart_vendor_rate_performance
+    description: "Average trip level tip percentage by vendor."
+    columns:
+      - name: vendor_id
+        description: "Vendor identifier defining the grain of the mart."
+        data_tests:
+          - unique
+          - not_null
+  - name: mart_distance_analysis
+    description: "Distance segment metrics for trips with valid duration."
+    columns:
+      - name: distance_category
+        description: "Distance category defining the grain of the mart."
+        data_tests:
+          - unique
+          - not_null
+  - name: mart_duration_data_quality
+    description: "Monitoring metrics by duration related issue type."
+    columns:
+      - name: issue_type
+        description: "Duration issue type defining the grain of the mart."
+        data_tests:
+          - unique
+          - not_null

@@ -1,159 +1,387 @@
-<img src="https://assets.website-files.com/61a888508b7cccb7485cdac2/61b31d9009792071f950394b_logo_dscovr.svg">
+# NYC Yellow Taxi Analytics — dbt & DuckDB
 
-# Data Engineer: DuckDB & DBT - Dynamic Data Modeling Challenge
+A local analytics pipeline built for the DSCOVR Data Engineering Challenge using NYC Yellow Taxi trip data for July 2026.
 
-## Abstract
+The project transforms raw Parquet records into a cleaned and enriched staging table, four analytical marts, and an additional duration-quality mart.
 
-This challenge tests your ability to work with data modeling, query optimization, and modern data tools like **DuckDB** and **DBT**. These tools are critical for the systems we build at [DSCOVR](https://dscovr.io), and this challenge will give us insight into your approach to building **staging models** and **data marts** from raw data.
+## Architecture
 
-Take your time to read the challenge, and when you're ready, provide an estimate of how long it will take. If necessary, feel free to request an extension. This exercise is designed to be stimulating and fun, so push your boundaries and show off your skills!
-
-**Red 🔴 - Green ✅ - Refactor 📝 - and have fun.**
-
----
-## Objective
-
-The challenge is to create a data pipeline using **DBT** and **DuckDB**, starting from raw data, transforming it into staging models, and finally creating **data marts**. 
-
-Your goal is to build a **DBT project**:
-
-1. Use a **public dataset** (details provided below) as the raw data source.
-2. **Staging models**: to clean, normalize, and enrich the raw data.
-3. **Data marts**: to extract key metrics and generate insights for decision-making.
-
----
-
-## Dataset
-
-We will use the **New York City Taxi Trips Dataset**, which contains trip records of taxis in NYC. This dataset is publicly available and can be downloaded using the following:
-
-```shell
-$ wget https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet  
+```text
+yellow_tripdata_2026-07.parquet
+              |
+              v
+staging_yellow_tripdata
+              |
+              +--> mart_trips_by_time_of_day
+              +--> mart_top_pickup_zones
+              +--> mart_vendor_rate_performance
+              +--> mart_distance_analysis
+              +--> mart_duration_data_quality
 ```
 
-**Key Columns**:
-- `VendorID`: ID of the provider.
-- `tpep_pickup_datetime`, `tpep_dropoff_datetime`: trip start and end timestamps.
-- `passenger_count`: number of passengers.
-- `trip_distance`: distance of the trip in miles.
-- `RatecodeID`: rate code.
-- `fare_amount`: trip fare.
-- `tip_amount`: tip amount.
-- `total_amount`: total paid.
-- And other useful columns for metric calculations.
+DuckDB reads the Parquet source directly. All marts reference staging through dbt's `ref()`, which defines their dependencies and build order.
 
----
+All six models are materialized as tables. This provides a persisted staging dataset for downstream aggregations and results that can be inspected without rerunning the transformations.
 
-## Tasks: Required Models
+## Project structure
 
-### 1. **Staging Models** [Mandatory]
-Create staging models to clean and enrich the data by:
-- **Timestamp formatting**: Standardize date/time formats and calculate:
-  - Trip duration in minutes.
-- **Data cleaning**: Remove rows with implausible values (e.g., negative `trip_distance`, `total_amount` ≤ 0).
-- **Additional flags**:
-  - Identify if the trip was prepaid (`payment_type` = 2).
-  - Classify trips based on distance (e.g., short, medium, long).
+```text
+models/
+├── staging/
+│   ├── staging_yellow_tripdata.sql
+│   └── schema.yml
+└── marts/
+    ├── mart_trips_by_time_of_day.sql
+    ├── mart_top_pickup_zones.sql
+    ├── mart_vendor_rate_performance.sql
+    ├── mart_distance_analysis.sql
+    ├── mart_duration_data_quality.sql
+    └── schema.yml
 
-### 2. **Data Marts**
-Create the following **marts** to provide insights:
+macros/
+└── classify_distance.sql
 
-#### A. **Trips by Time of Day** [Mandatory]
-- Calculate the total number of trips and total revenue (`total_amount`) for different time slots:
-  - Morning (5:00-12:00)
-  - Afternoon (12:00-17:00)
-  - Evening (17:00-22:00)
-  - Night (22:00-5:00)
+tests/
+├── assert_time_of_day_reconciliation.sql
+├── assert_distance_analysis_reconciliation.sql
+└── assert_duration_quality_reconciliation.sql
 
-#### B. **Top 5 Pickup Zones** [Mandatory]
-- Identify the top 5 pickup zones (`PULocationID`) with:
-  - The highest number of trips.
-  - The highest total revenue.
+notebooks/
+└── results_analysis.ipynb
 
-#### C. **Driver/Rate Performance** [Mandatory]
-- Analyze **tips**:
-  - Calculate the average tip percentage (`tip_amount / total_amount`) for each `VendorID`.
+docs/images/
+├── trips_and_revenue_by_time_of_day.png
+├── top_pickup_zones.png
+└── average_duration_by_distance.png
+```
 
-#### D. **Distance Analysis** [Mandatory]
-- Segment trips by distance (`trip_distance`):
-  - **Short**: 0-2 miles.
-  - **Medium**: 2-5 miles.
-  - **Long**: >5 miles.
-- Calculate the average trip duration and total revenue for each segment.
+## Setup and execution
 
----
+### Requirements
 
-## Evaluation Criteria
+- Python compatible with `pyproject.toml`.
+- `uv` for environment and dependency management.
+- Internet access for installing dependencies and downloading the dataset.
 
-1. **Clean and structured DBT project**:
-   - Clear and well-organized models (raw, staging, marts).
-   - Use of **DBT macros** to avoid repetitive logic.
-2. **Query performance**:
-   - Optimization of SQL queries for DuckDB.
-3. **Documentation**:
-   - A clear **README.md** explaining:
-     - How to run the project.
-     - Choices made in staging and marts models.
-     - How to run any included tests.
-4. **Bonus**:
-   - Implementation of DBT tests (`unique`, `not null`, etc.).
-   - Inclusion of visualizations for results (optional).
+The DuckDB CLI can be used for manual inspection. The dbt pipeline and notebook use the DuckDB Python package.
 
----
+Run all commands from the repository root.
 
-## Example Outputs
-
-Here are examples of expected output tables:
-
-### **A. Trips by Time of Day**
-| Time Slot    | Total Trips | Total Revenue |
-|--------------|-------------|---------------|
-| Morning      | 1,234       | $12,345.67    |
-| Afternoon    | 2,345       | $23,456.78    |
-| Evening      | 3,456       | $34,567.89    |
-| Night        | 1,123       | $11,234.56    |
-
----
-
-### Repo qick start
+### 1. Install dependencies
 
 ```shell
-$ uv venv
-$ source .venv/bin/activate
-$ uv sync
-# Linux (amd64)
-$ wget https://github.com/duckdb/duckdb/releases/download/v1.5.6/duckdb_cli-linux-amd64.zip && unzip duckdb_cli-linux-amd64.zip && mv duckdb .venv/bin/
-# macOS (Intel / Apple Silicon)
-$ wget https://github.com/duckdb/duckdb/releases/download/v1.5.6/duckdb_cli-osx-universal.zip && unzip duckdb_cli-osx-universal.zip && mv duckdb .venv/bin/
-$ uv run dbt deps 
-$ wget  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet -P data/raw
-$ uv run dbt run
-13:38:13  Running with dbt=1.12.5
-13:38:13  Registered adapter: duckdb=1.11.0
-13:38:13  Found 1 model, 616 macros
-13:38:13  
-13:38:13  Concurrency: 1 threads (target='dev')
-13:38:13  
-13:38:13  1 of 1 START sql table model main.staging_yellow_tripdata ...................... [RUN]
-13:38:14  1 of 1 OK created sql table model main.staging_yellow_tripdata ................. [OK in 0.74s]
-13:38:14  
-13:38:14  Finished running 1 table model in 0 hours 0 minutes and 0.96 seconds (0.96s).
-13:38:14  
-13:38:14  Completed successfully
-13:38:14  
-13:38:14  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1
+uv sync
+uv run dbt deps
+```
 
-$ uv run duckdb data/db/yellow_tripdata.duckdb "select  * from staging_yellow_tripdata limit 10"
----
+The local `profiles.yml` configures the development database at:
 
-### Submission
+```text
+data/db/yellow_tripdata.duckdb
+```
 
-1. Fork this repository and start your work on a new branch.
-2. Include a `README.md` file with instructions on how to run the project.
-3. Submit the repository as a `git bundle` or share it via GitHub/GitLab.
+### 2. Download the dataset
 
----
+On Windows PowerShell:
 
-## Contacts
+```powershell
+New-Item -ItemType Directory -Force data/raw, data/db
 
-For questions or clarifications: [https://linktr.ee/mauro.malvestio](https://linktr.ee/mauro.malvestio)
+Invoke-WebRequest `
+    -Uri "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet" `
+    -OutFile "data/raw/yellow_tripdata_2026-07.parquet"
+```
+
+On Linux or macOS:
+
+```shell
+mkdir -p data/raw data/db
+
+curl -L --fail \
+  https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-07.parquet \
+  -o data/raw/yellow_tripdata_2026-07.parquet
+```
+
+### 3. Validate the environment
+
+```shell
+uv run dbt debug --profiles-dir .
+```
+
+### 4. Build the models
+
+```shell
+uv run dbt run --profiles-dir .
+```
+
+### 5. Run the tests
+
+```shell
+uv run dbt test --profiles-dir .
+```
+
+Alternatively, build and test together:
+
+```shell
+uv run dbt build --profiles-dir .
+```
+
+## Modeling decisions
+
+### Explicit staging schema
+
+Staging preserves one row per source trip record. It selects the fields needed for the challenge rather than using `SELECT *`, and standardizes column names to snake_case.
+
+The model does not introduce a trip identifier or deduplicate records. Uniqueness is tested at the explicitly defined grain of each mart.
+
+### Basic cleaning
+
+Staging retains records satisfying:
+
+```sql
+trip_distance >= 0
+and total_amount > 0
+```
+
+These predicates exclude negative distances, non-positive total amounts, and null values in either field.
+
+Profiling recorded:
+
+| Population | Records |
+|---|---:|
+| Raw source | 3,530,109 |
+| Cleaned staging | 3,514,801 |
+| Removed | 15,308 |
+
+No additional upper-bound filter is applied to distance.
+
+### Duration precision
+
+Profiling identified positive trips shorter than one minute. Duration is calculated at second-level precision and converted to decimal minutes:
+
+```sql
+datediff(
+    'second',
+    tpep_pickup_datetime,
+    tpep_dropoff_datetime
+) / 60.0
+```
+
+For example, a 40-second trip retains a duration of approximately 0.667 minutes.
+
+### Duration-quality flag
+
+Staging adds `duration_quality_status`:
+
+| Status | Definition |
+|---|---|
+| `valid` | Dropoff is later than pickup |
+| `zero_duration` | Pickup and dropoff timestamps are equal |
+| `negative_duration` | Dropoff is earlier than pickup |
+
+This flag describes temporal consistency. It does not certify the overall validity of a trip.
+
+After basic cleaning, profiling recorded:
+
+| Status | Records |
+|---|---:|
+| `valid` | 3,472,496 |
+| `zero_duration` | 42,305 |
+
+The negative-duration record identified in the raw source did not survive the basic cleaning predicates.
+
+Timestamp anomalies are retained because those records can still contain useful revenue and distance information. Their status makes them available for monitoring and allows downstream models to apply explicit exclusions.
+
+Non-null tests on both timestamps detect missing inputs that the current classification does not handle separately.
+
+### Metric-specific populations
+
+Only `mart_distance_analysis` filters to:
+
+```sql
+duration_quality_status = 'valid'
+```
+
+This protects its average-duration metric from zero and negative durations.
+
+The other analytical marts retain all cleaned staging records because their metrics do not use trip duration.
+
+Consequently, counts and revenue in the distance mart represent a smaller population than those in the time-of-day mart.
+
+### Distance-classification macro
+
+The reusable `classify_distance` macro defines the rule. Staging calls it to materialize `distance_category`; downstream marts consume that column.
+
+| Category | Distance in miles |
+|---|---|
+| `short` | 0 ≤ distance < 2 |
+| `medium` | 2 ≤ distance ≤ 5 |
+| `long` | distance > 5 |
+
+The boundaries resolve the overlapping wording of the challenge: exactly 2 miles belongs to `medium`, and exactly 5 miles also belongs to `medium`.
+
+Centralizing the rule keeps the staging query readable and makes the classification reusable without repeating its `CASE` expression.
+
+### Payment flag
+
+`is_prepaid` follows the challenge's specified convention:
+
+```text
+payment_type = 2 → true
+```
+
+It should be interpreted as a challenge-specific flag.
+
+### Monetary outputs
+
+Revenue is calculated from `total_amount` and rounded after aggregation to two decimal places.
+
+The source monetary fields retain their floating-point representation. Rounding makes the outputs readable; it does not convert the underlying values to fixed-point financial amounts.
+
+## Analytical marts
+
+| Model | Grain | Metrics |
+|---|---|---|
+| `mart_trips_by_time_of_day` | One row per time category | Trip count, total revenue |
+| `mart_top_pickup_zones` | One row per selected pickup zone | Trip count, total revenue |
+| `mart_vendor_rate_performance` | One row per vendor | Average trip-level tip percentage |
+| `mart_distance_analysis` | One row per distance category | Trip count, average duration, total revenue |
+| `mart_duration_data_quality` | One row per observed duration issue type | Affected rows and revenue, amount and distance statistics |
+
+### Trips by time of day
+
+Categories use pickup time, with inclusive starting boundaries and exclusive ending boundaries:
+
+- Morning: 05:00–12:00.
+- Afternoon: 12:00–17:00.
+- Evening: 17:00–22:00.
+- Night: 22:00–05:00.
+
+No timezone conversion is applied to the source timestamps.
+
+### Top pickup zones
+
+The model selects five zones ordered by trip count and reports their revenue.
+
+It does not produce an independent top-five ranking by revenue.
+
+### Vendor tip performance
+
+The metric is:
+
+```sql
+avg(tip_amount / total_amount) * 100
+```
+
+Each trip has equal weight. This differs from calculating `sum(tip_amount) / sum(total_amount)`.
+
+Staging already guarantees a positive denominator. Results are grouped by vendor, not by individual driver.
+
+### Bonus duration-quality mart
+
+The additional mart reports only non-valid duration statuses:
+
+- `issue_type`
+- `affected_rows`
+- `affected_rows_pct`
+- `affected_revenue`
+- `avg_total_amount`
+- `avg_trip_distance`
+- `max_trip_distance`
+
+It makes the anomalies intentionally retained in staging visible for inspection.
+
+`affected_rows_pct` is the share of an issue type among anomalous records, not among all staging records. With only `zero_duration` present, its value is 100%.
+
+## Testing approach
+
+The suite contains 18 data tests and one unit test.
+
+### Mart grain
+
+`unique` and `not_null` tests check the category or identifier defining each mart's grain.
+
+These checks detect duplicate groups and unidentified groups. Staging attributes such as vendor ID are not tested for uniqueness because multiple trips legitimately share them.
+
+### Population reconciliation
+
+Three SQL tests compare:
+
+- Time-of-day trip counts and revenue with all staging records.
+- Distance-analysis trip counts and revenue with valid-duration staging records.
+- Duration-quality affected-row counts with anomalous staging records.
+
+Revenue comparisons allow small differences from separately rounded group totals: $0.03 for time categories and $0.02 for distance categories.
+
+These tests protect the intended population of each mart. They do not independently verify every category assignment.
+
+### Timestamp completeness
+
+`not_null` tests on pickup and dropoff timestamps verify that inputs required for duration calculation and pickup-time classification are present.
+
+### Category contracts
+
+`accepted_values` tests constrain duration statuses, distance categories, and time-of-day categories to their documented vocabulary.
+
+They protect category names against future changes, rather than proving correct assignment of each record.
+
+### Staging duration unit test
+
+The unit test replaces the raw source with three artificial records and executes the actual staging model:
+
+| Input case | Expected duration | Expected status |
+|---|---:|---|
+| 40-second trip | 40 / 60 minutes | `valid` |
+| Equal timestamps | 0 minutes | `zero_duration` |
+| Dropoff 30 seconds before pickup | −0.5 minutes | `negative_duration` |
+
+It verifies duration precision, anomaly classification, and retention of these records after basic cleaning.
+
+Run only this test with:
+
+```shell
+uv run dbt test --profiles-dir . --select staging_duration_cases
+```
+
+The latest local validation completed with six models built and all 19 tests passing.
+
+## Visualizations
+
+The notebook reads the materialized marts directly from DuckDB. It does not reimplement their aggregations.
+
+### Trips and revenue by time of day
+
+![Trips and revenue by time of day](docs/images/trips_and_revenue_by_time_of_day.png)
+
+Evening has the highest trip count and total revenue. All cleaned staging records are included.
+
+### Top five pickup zones by trip count
+
+![Top pickup zones](docs/images/top_pickup_zones.png)
+
+Zone 161 has the most trips, while zone 132 generates the most revenue among the five selected zones. Both charts show the same selection.
+
+### Average duration by distance category
+
+![Average duration by distance](docs/images/average_duration_by_distance.png)
+
+Average duration increases across distance categories. Only trips with valid duration are included.
+
+### Run the notebook
+
+Install the development dependencies with `uv sync`.
+
+In VS Code, open `notebooks/results_analysis.ipynb` and select the project's `.venv` Python interpreter as the notebook kernel.
+
+Run the cells in order. The notebook exports figures to `docs/images`.
+
+Close the notebook's DuckDB connection before rebuilding the database.
+
+## Limitations and assumptions
+
+- Cleaning covers the specified distance and amount predicates; it is not a complete validation of all source attributes.
+- Positive distance outliers remain. Profiling observed a maximum distance of 318,129.1 miles, so aggregate results should be interpreted with this limitation.
+- Missing timestamps are detected by tests; they do not have a separate quality status.
+- No trip key, deduplication rule, or pickup-zone lookup is introduced.
+- The pickup-zone mart ranks by trip count only.
+- All models use full table materialization; incremental processing is outside this single-file implementation.

@@ -13,3 +13,6 @@ dbt_packages/
 
 # Virtual environments
 .venv
+
+# Local interview preparation notes
+/PERSONAL_README.md

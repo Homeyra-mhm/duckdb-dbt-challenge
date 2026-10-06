@@ -1,11 +1,10 @@
--- Reconcile against valid-duration trips only.
+-- Reconcile against all trips accepted by the data-quality macro.
 -- Allow $0.02 for rounding across three revenue groups.
 with staging_totals as (
     select
         count(*) as total_trips,
         coalesce(sum(total_amount), 0) as total_revenue
     from {{ ref('staging_yellow_tripdata') }}
-    where duration_quality_status = 'valid'
 ),
 
 mart_totals as (

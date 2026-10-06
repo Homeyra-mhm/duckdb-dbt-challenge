@@ -1,46 +1,126 @@
-﻿version: 2
-
+version: 2
 models:
-  - name: mart_trips_by_time_of_day
-    description: "Trip counts and revenue by pickup time of day category."
-    columns:
-      - name: time_of_day
-        description: "Time of day category defining the grain of the mart."
-        data_tests:
-          - unique
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['morning', 'afternoon', 'evening', 'night']
-  - name: mart_top_pickup_zones
-    description: "Top five pickup zones ranked by trip count."
-    columns:
-      - name: pickup_location_id
-        description: "Pickup zone identifier defining the grain of the mart."
-        data_tests:
-          - unique
-          - not_null
-  - name: mart_vendor_rate_performance
-    description: "Average trip level tip percentage by vendor."
-    columns:
-      - name: vendor_id
-        description: "Vendor identifier defining the grain of the mart."
-        data_tests:
-          - unique
-          - not_null
-  - name: mart_distance_analysis
-    description: "Distance segment metrics for trips with valid duration."
-    columns:
-      - name: distance_category
-        description: "Distance category defining the grain of the mart."
-        data_tests:
-          - unique
-          - not_null
-  - name: mart_duration_data_quality
-    description: "Monitoring metrics by duration related issue type."
-    columns:
-      - name: issue_type
-        description: "Duration issue type defining the grain of the mart."
-        data_tests:
-          - unique
-          - not_null
+- name: mart_trips_by_time_of_day
+  description: Trip counts and revenue by pickup time of day category.
+  columns:
+  - name: time_of_day
+    description: 'Pickup time: morning [05:00, 12:00), afternoon [12:00, 17:00), evening [17:00, 22:00), night otherwise;
+      calculated by classify_time_slots.'
+    data_type: varchar
+    data_tests:
+    - unique
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - morning
+          - afternoon
+          - evening
+          - night
+  - name: total_trips
+    description: Number of accepted trip records in the group.
+    data_type: bigint
+  - name: total_revenue
+    description: Sum of total_amount in USD, rounded after aggregation to two decimal places.
+    data_type: double
+- name: mart_top_pickup_zones
+  description: Union of the top five pickup zones by trip count and by revenue, with one row per zone.
+  columns:
+  - name: pickup_location_id
+    description: TLC taxi-zone identifier where the trip started.
+    data_type: bigint
+    data_tests:
+    - unique
+    - not_null
+  - name: total_trips
+    description: Number of accepted trip records in the group.
+    data_type: bigint
+  - name: total_revenue
+    description: Sum of total_amount in USD, rounded after aggregation to two decimal places.
+    data_type: double
+  - name: trip_count_rank
+    description: Position across all zones by descending trip count; location ID breaks ties. Filter <= 5 for the
+      trip ranking.
+    data_type: bigint
+    data_tests:
+    - unique
+    - not_null
+  - name: revenue_rank
+    description: Position across all zones by descending unrounded revenue; location ID breaks ties. Filter <= 5
+      for the revenue ranking.
+    data_type: bigint
+    data_tests:
+    - unique
+    - not_null
+- name: mart_vendor_rate_performance
+  description: Average trip level tip percentage by vendor.
+  columns:
+  - name: vendor_id
+    description: TPEP provider identifier; not an individual driver identifier.
+    data_type: bigint
+    data_tests:
+    - unique
+    - not_null
+  - name: avg_tip_percentage
+    description: Unweighted mean of tip_amount / total_amount multiplied by 100, rounded to two decimals.
+    data_type: double
+- name: mart_distance_analysis
+  description: Distance segment metrics for all trips accepted by the data-quality macro.
+  columns:
+  - name: distance_category
+    description: 'Distance in miles: short [0, 2), medium [2, 5], long > 5; calculated by classify_distance.'
+    data_type: varchar
+    data_tests:
+    - unique
+    - not_null
+  - name: total_trips
+    description: Number of accepted trip records in the group.
+    data_type: bigint
+  - name: avg_trip_duration_minutes
+    description: Arithmetic mean of accepted trip durations, including zero durations, rounded to two decimals.
+    data_type: double
+  - name: total_revenue
+    description: Sum of total_amount in USD, rounded after aggregation to two decimal places.
+    data_type: double
+unit_tests:
+- name: top_pickup_zones_independent_rankings
+  description: A zone outside the top five by trips must still appear when it leads by revenue.
+  model: mart_top_pickup_zones
+  given:
+  - input: ref('staging_yellow_tripdata')
+    format: sql
+    rows: "select pickup_location_id, total_amount\nfrom (values\n    (1, 6, 1.0::double),\n    (2, 5, 1.0::double),\n\
+      \    (3, 4, 1.0::double),\n    (4, 3, 1.0::double),\n    (5, 2, 1.0::double),\n    (6, 1, 100.0::double)\n\
+      ) as zones(pickup_location_id, trip_count, total_amount)\ncross join lateral range(trip_count) as trips(trip_number)\n"
+  expect:
+    rows:
+    - pickup_location_id: 1
+      total_trips: 6
+      total_revenue: 6.0
+      trip_count_rank: 1
+      revenue_rank: 2
+    - pickup_location_id: 2
+      total_trips: 5
+      total_revenue: 5.0
+      trip_count_rank: 2
+      revenue_rank: 3
+    - pickup_location_id: 3
+      total_trips: 4
+      total_revenue: 4.0
+      trip_count_rank: 3
+      revenue_rank: 4
+    - pickup_location_id: 4
+      total_trips: 3
+      total_revenue: 3.0
+      trip_count_rank: 4
+      revenue_rank: 5
+    - pickup_location_id: 5
+      total_trips: 2
+      total_revenue: 2.0
+      trip_count_rank: 5
+      revenue_rank: 6
+    - pickup_location_id: 6
+      total_trips: 1
+      total_revenue: 100.0
+      trip_count_rank: 6
+      revenue_rank: 1

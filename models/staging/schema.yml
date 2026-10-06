@@ -1,73 +1,267 @@
 version: 2
-
 models:
-  - name: staging_yellow_tripdata
-    description: "Cleaned trip records with duration quality and distance classification."
-    columns:
-      - name: pickup_datetime
-        description: "Required to calculate duration and assign the pickup time bucket."
-        data_tests:
-          - not_null
-      - name: dropoff_datetime
-        description: "Required to calculate duration and classify timestamp quality."
-        data_tests:
-          - not_null
-      - name: duration_quality_status
-        description: "Timestamp consistency: valid, zero duration, or negative duration."
-        data_tests:
-          - accepted_values:
-              arguments:
-                values: ['valid', 'zero_duration', 'negative_duration']
-      - name: distance_category
-        description: "Distance in miles: short [0, 2), medium [2, 5], long > 5."
-        data_tests:
-          - accepted_values:
-              arguments:
-                values: ['short', 'medium', 'long']
-
+- name: staging_yellow_raw_tripdata
+  description: All source records with standardized names and types plus is_valid; no filtering or analytical enhancements.
+  columns:
+  - name: vendor_id
+    description: TPEP provider identifier; not an individual driver identifier.
+    data_type: bigint
+  - name: pickup_datetime
+    description: Trip start timestamp from the source, without timezone conversion.
+    data_type: timestamp
+  - name: dropoff_datetime
+    description: Trip end timestamp from the source, without timezone conversion.
+    data_type: timestamp
+  - name: passenger_count
+    description: Reported passenger count; null or zero values are retained by the current validity policy.
+    data_type: bigint
+  - name: trip_distance
+    description: Taximeter-reported distance in miles.
+    data_type: double
+  - name: rate_code_id
+    description: Final rate code; null and unknown codes are retained.
+    data_type: bigint
+  - name: store_and_fwd_flag
+    description: Source flag indicating whether the trip was stored before transmission.
+    data_type: varchar
+  - name: pickup_location_id
+    description: TLC taxi-zone identifier where the trip started.
+    data_type: bigint
+  - name: dropoff_location_id
+    description: TLC taxi-zone identifier where the trip ended.
+    data_type: bigint
+  - name: payment_type
+    description: Source payment code; code 2 is used for is_prepaid as required by the assignment.
+    data_type: bigint
+  - name: fare_amount
+    description: Source fare amount in USD.
+    data_type: double
+  - name: extra
+    description: Source extras and surcharges in USD.
+    data_type: double
+  - name: mta_tax
+    description: Source MTA tax amount in USD.
+    data_type: double
+  - name: tip_amount
+    description: Recorded tip amount in USD; the source does not capture cash tips.
+    data_type: double
+  - name: tolls_amount
+    description: Source toll amount in USD.
+    data_type: double
+  - name: improvement_surcharge
+    description: Source improvement surcharge in USD.
+    data_type: double
+  - name: total_amount
+    description: Source total charged amount in USD, used for revenue and tip-percentage metrics.
+    data_type: double
+  - name: congestion_surcharge
+    description: Source congestion surcharge in USD.
+    data_type: double
+  - name: airport_fee
+    description: Source airport pickup fee in USD.
+    data_type: double
+  - name: cbd_congestion_fee
+    description: Source central business district congestion fee in USD.
+    data_type: double
+  - name: request_source
+    description: Source identifier for the trip request channel, when available.
+    data_type: varchar
+  - name: is_valid
+    description: 'Boolean from classify_row_data_quality: null/negative distance, null/nonpositive amount, or dropoff
+      before pickup is invalid. Raw records are retained.'
+    data_type: boolean
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - true
+          - false
+          quote: false
+- name: staging_yellow_tripdata
+  description: Accepted raw records enriched with duration, the assignment payment flag, distance category and pickup
+    time category.
+  columns:
+  - name: vendor_id
+    description: TPEP provider identifier; not an individual driver identifier.
+    data_type: bigint
+  - name: pickup_datetime
+    description: Trip start timestamp from the source, without timezone conversion.
+    data_type: timestamp
+    data_tests:
+    - not_null
+  - name: dropoff_datetime
+    description: Trip end timestamp from the source, without timezone conversion.
+    data_type: timestamp
+    data_tests:
+    - not_null
+  - name: passenger_count
+    description: Reported passenger count; null or zero values are retained by the current validity policy.
+    data_type: bigint
+  - name: trip_distance
+    description: Taximeter-reported distance in miles.
+    data_type: double
+  - name: rate_code_id
+    description: Final rate code; null and unknown codes are retained.
+    data_type: bigint
+  - name: pickup_location_id
+    description: TLC taxi-zone identifier where the trip started.
+    data_type: bigint
+  - name: dropoff_location_id
+    description: TLC taxi-zone identifier where the trip ended.
+    data_type: bigint
+  - name: payment_type
+    description: Source payment code; code 2 is used for is_prepaid as required by the assignment.
+    data_type: bigint
+  - name: fare_amount
+    description: Source fare amount in USD.
+    data_type: double
+  - name: tip_amount
+    description: Recorded tip amount in USD; the source does not capture cash tips.
+    data_type: double
+  - name: total_amount
+    description: Source total charged amount in USD, used for revenue and tip-percentage metrics.
+    data_type: double
+  - name: trip_duration_minutes
+    description: Trip duration in decimal minutes using second-level precision; zero duration is allowed.
+    data_type: double
+  - name: is_prepaid
+    description: True when payment_type = 2, following the assignment convention rather than TLC payment terminology.
+    data_type: boolean
+  - name: distance_category
+    description: 'Distance in miles: short [0, 2), medium [2, 5], long > 5; calculated by classify_distance.'
+    data_type: varchar
+    data_tests:
+    - accepted_values:
+        arguments:
+          values:
+          - short
+          - medium
+          - long
+  - name: time_of_day
+    description: 'Pickup time: morning [05:00, 12:00), afternoon [12:00, 17:00), evening [17:00, 22:00), night otherwise;
+      calculated by classify_time_slots.'
+    data_type: varchar
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - morning
+          - afternoon
+          - evening
+          - night
+  - name: is_valid
+    description: 'True for every record: final staging retains only rows accepted by classify_row_data_quality.'
+    data_type: boolean
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - true
+          quote: false
 sources:
-  - name: nyc_taxi
-    description: "NYC Yellow Taxi July 2026 raw Parquet data."
-    tables:
-      - name: yellow_tripdata
-        config:
-          meta:
-            external_location: "data/raw/yellow_tripdata_2026-07.parquet"
-
+- name: nyc_taxi
+  description: NYC Yellow Taxi July 2026 raw Parquet data.
+  tables:
+  - name: yellow_tripdata
+    config:
+      meta:
+        external_location: data/raw/yellow_tripdata_2026-07.parquet
+    description: External Parquet source from the file supplied by the assignment; source rows are not deduplicated.
 unit_tests:
-  - name: staging_duration_cases
-    description: "Preserve sub-minute trips and classify zero and negative durations."
-    model: staging_yellow_tripdata
-    given:
-      - input: source('nyc_taxi', 'yellow_tripdata')
-        format: sql
-        rows: |
-          select
-              1::integer as VendorID,
-              timestamp '2026-07-01 10:00:00' as tpep_pickup_datetime,
-              dropoff as tpep_dropoff_datetime,
-              1::bigint as passenger_count,
-              1.0::double as trip_distance,
-              1::bigint as RatecodeID,
-              161::integer as PULocationID,
-              237::integer as DOLocationID,
-              1::bigint as payment_type,
-              8.0::double as fare_amount,
-              2.0::double as tip_amount,
-              10.0::double as total_amount
-          from (values
-              (timestamp '2026-07-01 10:00:40'),
-              (timestamp '2026-07-01 10:00:00'),
-              (timestamp '2026-07-01 09:59:30')
-          ) as cases(dropoff)
-    expect:
-      rows:
-        - dropoff_datetime: '2026-07-01 10:00:40'
-          trip_duration_minutes: 0.6666666666666666
-          duration_quality_status: valid
-        - dropoff_datetime: '2026-07-01 10:00:00'
-          trip_duration_minutes: 0.0
-          duration_quality_status: zero_duration
-        - dropoff_datetime: '2026-07-01 09:59:30'
-          trip_duration_minutes: -0.5
-          duration_quality_status: negative_duration
+- name: staging_duration_cases
+  description: Preserve sub-minute and zero-duration trips; exclude raw records flagged invalid for negative duration.
+  model: staging_yellow_tripdata
+  given:
+  - input: ref('staging_yellow_raw_tripdata')
+    format: sql
+    rows: "select\n    is_valid,\n    1::integer as vendor_id,\n    timestamp '2026-07-01 10:00:00' as pickup_datetime,\n\
+      \    dropoff as dropoff_datetime,\n    1::bigint as passenger_count,\n    1.0::double as trip_distance,\n\
+      \    1::bigint as rate_code_id,\n    161::integer as pickup_location_id,\n    237::integer as dropoff_location_id,\n\
+      \    1::bigint as payment_type,\n    8.0::double as fare_amount,\n    2.0::double as tip_amount,\n    10.0::double\
+      \ as total_amount\nfrom (values\n    (timestamp '2026-07-01 10:00:40', true),\n    (timestamp '2026-07-01\
+      \ 10:00:00', true),\n    (timestamp '2026-07-01 09:59:30', false)\n) as cases(dropoff, is_valid)\n"
+  expect:
+    rows:
+    - dropoff_datetime: '2026-07-01 10:00:40'
+      trip_duration_minutes: 0.6666666666666666
+    - dropoff_datetime: '2026-07-01 10:00:00'
+      trip_duration_minutes: 0.0
+- name: staging_data_quality_cases
+  description: Classify each invalid condition independently and retain invalid raw records.
+  model: staging_yellow_raw_tripdata
+  given:
+  - input: source('nyc_taxi', 'yellow_tripdata')
+    format: sql
+    rows: "select\n    1::integer as VendorID,\n    timestamp '2026-07-01 10:00:00' as tpep_pickup_datetime,\n \
+      \   dropoff as tpep_dropoff_datetime,\n    1::bigint as passenger_count,\n    trip_distance,\n    1::bigint\
+      \ as RatecodeID,\n    161::integer as PULocationID,\n    237::integer as DOLocationID,\n    1::bigint as payment_type,\n\
+      \    8.0::double as fare_amount,\n    2.0::double as tip_amount,\n    null::varchar as store_and_fwd_flag,\n\
+      \    null::double as extra,\n    null::double as mta_tax,\n    null::double as tolls_amount,\n    null::double\
+      \ as improvement_surcharge,\n    null::double as congestion_surcharge,\n    null::double as Airport_fee,\n\
+      \    null::double as cbd_congestion_fee,\n    null::varchar as request_source,\n    total_amount\nfrom (values\n\
+      \    (0.0::double, 10.0::double, timestamp '2026-07-01 10:01:00'),\n    (1.0::double, 10.0::double, timestamp\
+      \ '2026-07-01 10:01:00'),\n    (-1.0::double, 10.0::double, timestamp '2026-07-01 10:01:00'),\n    (1.0::double,\
+      \ 0.0::double, timestamp '2026-07-01 10:01:00'),\n    (1.0::double, -10.0::double, timestamp '2026-07-01 10:01:00'),\n\
+      \    (null::double, 10.0::double, timestamp '2026-07-01 10:01:00'),\n    (1.0::double, null::double, timestamp\
+      \ '2026-07-01 10:01:00'),\n    (1.0::double, 10.0::double, timestamp '2026-07-01 10:00:00'),\n    (1.0::double,\
+      \ 10.0::double, timestamp '2026-07-01 09:59:30'),\n    (1.0::double, 10.0::double, timestamp '2026-07-01 09:59:59.999999')\n\
+      ) as cases(trip_distance, total_amount, dropoff)\n"
+  expect:
+    rows:
+    - trip_distance: 0.0
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: true
+    - trip_distance: 1.0
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: true
+    - trip_distance: -1.0
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: false
+    - trip_distance: 1.0
+      total_amount: 0.0
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: false
+    - trip_distance: 1.0
+      total_amount: -10.0
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: false
+    - trip_distance: null
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: false
+    - trip_distance: 1.0
+      total_amount: null
+      dropoff_datetime: '2026-07-01 10:01:00'
+      is_valid: false
+    - trip_distance: 1.0
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 10:00:00'
+      is_valid: true
+    - trip_distance: 1.0
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 09:59:30'
+      is_valid: false
+    - trip_distance: 1.0
+      total_amount: 10.0
+      dropoff_datetime: '2026-07-01 09:59:59.999999'
+      is_valid: false
+- name: staging_valid_records_only
+  description: Final staging retains only records classified as valid by raw staging.
+  model: staging_yellow_tripdata
+  given:
+  - input: ref('staging_yellow_raw_tripdata')
+    rows:
+    - pickup_datetime: '2026-07-01 10:00:00'
+      is_valid: true
+    - pickup_datetime: '2026-07-01 10:00:00'
+      is_valid: false
+  expect:
+    rows:
+    - is_valid: true
+      time_of_day: morning

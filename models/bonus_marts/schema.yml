@@ -1,0 +1,38 @@
+version: 2
+models:
+- name: mart_data_quality
+  description: One summary row for records rejected by classify_row_data_quality in raw staging.
+  columns:
+  - name: is_valid
+    description: 'False: this single summary row represents invalid raw records only.'
+    data_type: boolean
+    data_tests:
+    - unique
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - false
+          quote: false
+  - name: affected_rows
+    description: Number of invalid raw records; zero when no records are rejected.
+    data_type: bigint
+    data_tests:
+    - not_null
+  - name: affected_rows_pct
+    description: Invalid records as a percentage of all raw records, rounded to two decimals; null for an empty
+      source.
+    data_type: double
+  - name: affected_revenue
+    description: Signed sum of available total amounts for invalid records in USD, rounded to two decimals; zero
+      when none are available. Not lost revenue.
+    data_type: double
+  - name: avg_total_amount
+    description: Average available total amount in USD for invalid records, rounded to two decimals.
+    data_type: double
+  - name: avg_trip_distance
+    description: Average available distance in miles for invalid records, rounded to two decimals.
+    data_type: double
+  - name: max_trip_distance
+    description: Maximum available distance in miles for invalid records, rounded to two decimals.
+    data_type: double

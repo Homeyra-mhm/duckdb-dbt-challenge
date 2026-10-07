@@ -158,7 +158,7 @@ This table combines both top-five lists. Use `trip_count_rank <= 5` for trips an
 
 ## Visualizations
 
-The [notebook](notebooks/results_analysis.ipynb) reads the marts and generates these charts.
+The [notebook](notebooks/results_analysis.ipynb) reads the marts and generates these charts. Labels are rounded for readability; the tables above show the detailed results.
 
 ### Trips and revenue by pickup time
 
